@@ -213,6 +213,8 @@ export function initializeBrowserPreview() {
 			if (command.startsWith("plugin:resources|")) return null;
 			if (command === "get_current_recording") return null;
 			if (command === "get_general_settings") return null;
+			if (command === "list_capture_windows") return [];
+			if (command === "get_default_excluded_windows") return [];
 			return null;
 		},
 		{ shouldMockEvents: true },

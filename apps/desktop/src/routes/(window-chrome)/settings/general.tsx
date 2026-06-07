@@ -293,7 +293,7 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 	const ostype: OsType = type();
 	const excludedWindows = createMemo(() => settings.excludedWindows ?? []);
 	const missingDefaultExclusions = createMemo(() =>
-		defaultExcludedWindows().filter(
+		(defaultExcludedWindows() ?? []).filter(
 			(defaultEntry) =>
 				!excludedWindows().some((entry) =>
 					coversDefaultExclusion(entry, defaultEntry),
