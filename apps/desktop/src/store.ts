@@ -19,6 +19,27 @@ export type UserProfileStore = {
 	updatedAt: number;
 };
 
+export type CourseModule = {
+	id: string;
+	name: string;
+};
+
+export type Course = {
+	id: string;
+	name: string;
+	modules: CourseModule[];
+};
+
+export type CourseAssignment = {
+	courseId: string;
+	moduleId: string | null;
+};
+
+export type CourseLibraryStore = {
+	courses: Course[];
+	assignments: Record<string, CourseAssignment>;
+};
+
 let _store: Promise<Store> | undefined;
 const store = () => {
 	if (!_store) {
@@ -77,6 +98,13 @@ export const userProfileStore = declareStore<UserProfileStore>("user_profile");
 export const hotkeysStore = declareStore<HotkeysStore>("hotkeys");
 export const generalSettingsStore =
 	declareStore<GeneralSettingsStore>("general_settings");
+export const courseLibraryStore = declareStore<CourseLibraryStore>(
+	"course_library",
+	{
+		courses: [],
+		assignments: {},
+	},
+);
 export const recordingSettingsStore = declareStore<RecordingSettingsStore>(
 	"recording_settings",
 	{

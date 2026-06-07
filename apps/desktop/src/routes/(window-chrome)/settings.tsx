@@ -205,7 +205,7 @@ export default function Settings(props: RouteSectionProps) {
 		},
 		{
 			href: "recordings",
-			name: "Recordings",
+			name: "Course Library",
 			icon: IconLucideSquarePlay,
 		},
 		{

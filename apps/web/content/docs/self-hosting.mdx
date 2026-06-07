@@ -120,10 +120,25 @@ OPENAI_API_KEY=your-key      # AI summaries (fallback)
 
 ### Google OAuth
 
+Create a Google Cloud OAuth client to enable Google sign-in and Google Drive storage:
+
+1. Enable the Google Drive API in your Google Cloud project.
+2. Configure the OAuth consent screen.
+3. Create an OAuth 2.0 Client ID with application type **Web application**.
+4. Add this authorized redirect URI:
+   ```
+   https://your-cap-domain.example/api/desktop/storage/google-drive/callback
+   ```
+5. Add your Cap domain as an authorized JavaScript origin if you also use Google sign-in.
+
 ```bash
 GOOGLE_CLIENT_ID=your-client-id
 GOOGLE_CLIENT_SECRET=your-secret
 ```
+
+Cap requests the `drive.file` scope and creates a private `Cap` folder. It can
+only access files created or opened through Cap. `WEB_URL` and `NEXTAUTH_URL`
+must match the public HTTPS origin used in the redirect URI.
 
 ## Production Checklist
 

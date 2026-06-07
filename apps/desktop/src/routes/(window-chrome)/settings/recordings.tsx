@@ -21,9 +21,20 @@ import {
 	Show,
 } from "solid-js";
 import { createStore, produce } from "solid-js/store";
+import { CourseFolderSelect } from "~/components/CourseFolderSelect";
 import CapTooltip from "~/components/Tooltip";
 import { Input } from "~/routes/editor/ui";
+import {
+	type Course,
+	type CourseAssignment,
+	courseLibraryStore,
+} from "~/store";
 import { trackEvent } from "~/utils/analytics";
+import {
+	assignRecording,
+	createCourseId,
+	createModuleId,
+} from "~/utils/course-library";
 import { createTauriEventListener } from "~/utils/createEventListener";
 import { importVideoFromPicker, showImportError } from "~/utils/importMedia";
 import { openRecordingFolder } from "~/utils/recording";
@@ -33,8 +44,11 @@ import {
 	type RecordingMetaWithMetadata,
 	type UploadProgress,
 } from "~/utils/tauri";
+import IconLucideFolderPlus from "~icons/lucide/folder-plus";
 import IconLucideImport from "~icons/lucide/import";
+import IconLucidePlus from "~icons/lucide/plus";
 import IconLucideSearch from "~icons/lucide/search";
+import IconLucideTrash2 from "~icons/lucide/trash-2";
 import { Section, SettingsPageContent } from "./Setting";
 
 type Recording = {
@@ -108,10 +122,21 @@ export default function Recordings() {
 	const trimmedSearch = createMemo(() => search().trim());
 	const normalizedSearch = createMemo(() => trimmedSearch().toLowerCase());
 	const [visibleCount, setVisibleCount] = createSignal(PAGE_SIZE);
+	const [selectedFolder, setSelectedFolder] = createSignal("all");
+	const [newCourseName, setNewCourseName] = createSignal("");
+	const [newModuleName, setNewModuleName] = createSignal("");
 	const [uploadProgress, setUploadProgress] = createStore<
 		Record</* video_id */ string, number>
 	>({});
 	const recordings = createQuery(() => recordingsQuery);
+	const courseLibrary = courseLibraryStore.createQuery();
+	const courses = createMemo(() => courseLibrary.data?.courses ?? []);
+	const assignments = createMemo(() => courseLibrary.data?.assignments ?? {});
+	const selectedCourse = createMemo(() => {
+		const [kind, courseId] = selectedFolder().split(":");
+		if (kind !== "course" && kind !== "module") return undefined;
+		return courses().find((course) => course.id === courseId);
+	});
 
 	createTauriEventListener(events.uploadProgressEvent, (e) => {
 		if (e.uploaded === "0" && e.total === "0") {
@@ -132,6 +157,7 @@ export default function Recordings() {
 	createEffect(() => {
 		activeTab();
 		trimmedSearch();
+		selectedFolder();
 		setVisibleCount(PAGE_SIZE);
 	});
 
@@ -141,9 +167,23 @@ export default function Recordings() {
 			activeTab() === "all"
 				? data
 				: data.filter((recording) => recording.meta.mode === activeTab());
+		const folder = selectedFolder();
+		const folderRecordings = scopedRecordings.filter((recording) => {
+			if (folder === "all") return true;
+			const assignment = assignments()[recording.path];
+			if (folder === "unassigned") return !assignment;
+			const [kind, courseId, moduleId] = folder.split(":");
+			if (kind === "course")
+				return assignment?.courseId === courseId && !assignment.moduleId;
+			return (
+				kind === "module" &&
+				assignment?.courseId === courseId &&
+				assignment.moduleId === moduleId
+			);
+		});
 		const query = normalizedSearch();
-		if (!query) return scopedRecordings;
-		return scopedRecordings.filter((recording) =>
+		if (!query) return folderRecordings;
+		return folderRecordings.filter((recording) =>
 			recording.prettyName.toLowerCase().includes(query),
 		);
 	});
@@ -198,12 +238,89 @@ export default function Recordings() {
 		}
 	};
 
+	const createCourse = async () => {
+		const name = newCourseName().trim();
+		if (!name) return;
+		const course: Course = { id: createCourseId(), name, modules: [] };
+		await courseLibraryStore.set({ courses: [...courses(), course] });
+		setNewCourseName("");
+		setSelectedFolder(`course:${course.id}`);
+	};
+
+	const createModule = async () => {
+		const course = selectedCourse();
+		const name = newModuleName().trim();
+		if (!course || !name) return;
+		const module = { id: createModuleId(), name };
+		await courseLibraryStore.set({
+			courses: courses().map((item) =>
+				item.id === course.id
+					? { ...item, modules: [...item.modules, module] }
+					: item,
+			),
+		});
+		setNewModuleName("");
+		setSelectedFolder(`module:${course.id}:${module.id}`);
+	};
+
+	const deleteCourse = async (course: Course) => {
+		if (
+			!(await ask(
+				`Delete "${course.name}"? Recordings will become unassigned.`,
+			))
+		)
+			return;
+		const nextAssignments = Object.fromEntries(
+			Object.entries(assignments()).filter(
+				([, assignment]) => assignment.courseId !== course.id,
+			),
+		);
+		await courseLibraryStore.set({
+			courses: courses().filter((item) => item.id !== course.id),
+			assignments: nextAssignments,
+		});
+		setSelectedFolder("all");
+	};
+
+	const deleteModule = async (course: Course, moduleId: string) => {
+		const module = course.modules.find((item) => item.id === moduleId);
+		if (
+			!module ||
+			!(await ask(
+				`Delete "${module.name}"? Its recordings will move to ${course.name}.`,
+			))
+		)
+			return;
+		const nextAssignments = Object.fromEntries(
+			Object.entries(assignments()).map(([path, assignment]) => [
+				path,
+				assignment.courseId === course.id && assignment.moduleId === moduleId
+					? { courseId: course.id, moduleId: null }
+					: assignment,
+			]),
+		);
+		await courseLibraryStore.set({
+			courses: courses().map((item) =>
+				item.id === course.id
+					? {
+							...item,
+							modules: item.modules.filter(
+								(moduleItem) => moduleItem.id !== moduleId,
+							),
+						}
+					: item,
+			),
+			assignments: nextAssignments,
+		});
+		setSelectedFolder(`course:${course.id}`);
+	};
+
 	return (
 		<div class="cap-settings-page flex relative flex-col w-full h-full custom-scroll">
 			<SettingsPageContent class="max-w-none space-y-4">
 				<Section
-					title="Recordings"
-					description="Manage your recordings and perform actions."
+					title="Course Library"
+					description="Organize recordings into courses and modules without moving the underlying Cap projects."
 					right={
 						<Button
 							variant="gray"
@@ -216,112 +333,254 @@ export default function Recordings() {
 						</Button>
 					}
 				>
-					<Show
-						when={recordings.data && recordings.data.length > 0}
-						fallback={
-							<p class="text-center text-(--text-tertiary) absolute flex items-center justify-center w-full h-full">
-								No recordings found
-							</p>
-						}
-					>
-						<div class="flex flex-col gap-3 pb-4 w-full border-b border-gray-2">
-							<div class="flex flex-wrap gap-3 items-center">
-								<For each={Tabs}>
-									{(tab) => (
-										<div
-											class={cx(
-												"flex gap-1.5 items-center transition-colors duration-200 p-2 px-3 border rounded-full",
-												activeTab() === tab.id
-													? "bg-gray-5 cursor-default border-gray-5"
-													: "bg-transparent cursor-pointer hover:bg-gray-3 border-gray-5",
-											)}
-											onClick={() => setActiveTab(tab.id)}
-										>
-											{tab.icon && tab.icon}
-											<p class="text-xs text-gray-12">{tab.label}</p>
+					<div class="flex min-h-[32rem] overflow-hidden rounded-xl border border-gray-3 bg-gray-2">
+						<aside class="flex w-56 shrink-0 flex-col border-r border-gray-3 bg-gray-1">
+							<div class="space-y-1 border-b border-gray-3 p-3">
+								<LibraryFolderButton
+									label="All recordings"
+									selected={selectedFolder() === "all"}
+									onClick={() => setSelectedFolder("all")}
+								/>
+								<LibraryFolderButton
+									label="Unassigned"
+									selected={selectedFolder() === "unassigned"}
+									onClick={() => setSelectedFolder("unassigned")}
+								/>
+							</div>
+							<div class="flex-1 space-y-1 overflow-y-auto p-3">
+								<For each={courses()}>
+									{(course) => (
+										<div>
+											<div class="group flex items-center gap-1">
+												<LibraryFolderButton
+													label={course.name}
+													selected={selectedFolder() === `course:${course.id}`}
+													onClick={() =>
+														setSelectedFolder(`course:${course.id}`)
+													}
+												/>
+												<button
+													type="button"
+													class="rounded-md p-1 text-gray-9 opacity-0 hover:bg-gray-3 hover:text-red-10 group-hover:opacity-100"
+													onClick={() => deleteCourse(course)}
+													aria-label={`Delete ${course.name}`}
+												>
+													<IconLucideTrash2 class="size-3.5" />
+												</button>
+											</div>
+											<For each={course.modules}>
+												{(module) => (
+													<div class="group ml-4 flex items-center gap-1">
+														<LibraryFolderButton
+															label={module.name}
+															selected={
+																selectedFolder() ===
+																`module:${course.id}:${module.id}`
+															}
+															onClick={() =>
+																setSelectedFolder(
+																	`module:${course.id}:${module.id}`,
+																)
+															}
+														/>
+														<button
+															type="button"
+															class="rounded-md p-1 text-gray-9 opacity-0 hover:bg-gray-3 hover:text-red-10 group-hover:opacity-100"
+															onClick={() => deleteModule(course, module.id)}
+															aria-label={`Delete ${module.name}`}
+														>
+															<IconLucideTrash2 class="size-3.5" />
+														</button>
+													</div>
+												)}
+											</For>
 										</div>
 									)}
 								</For>
 							</div>
-							<div class="relative w-full max-w-[260px] h-[36px] flex items-center">
-								<IconLucideSearch class="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none size-3 text-gray-10" />
-								<Input
-									type="search"
-									class="py-2 pl-6 h-full w-full"
-									value={search()}
-									onInput={(event) => setSearch(event.currentTarget.value)}
-									onKeyDown={(event) => {
-										if (event.key === "Escape" && search()) {
-											event.preventDefault();
-											setSearch("");
+							<div class="space-y-2 border-t border-gray-3 p-3">
+								<div class="flex gap-1.5">
+									<Input
+										value={newCourseName()}
+										onInput={(event) =>
+											setNewCourseName(event.currentTarget.value)
 										}
-									}}
-									placeholder="Search"
-									autoCapitalize="off"
-									autocorrect="off"
-									autocomplete="off"
-									spellcheck={false}
-									aria-label="Search recordings"
-								/>
-							</div>
-						</div>
-
-						<div class="flex relative flex-col flex-1 mt-4 rounded-xl border custom-scroll bg-gray-2 border-gray-3">
-							<Show when={filteredRecordings().length === 0}>
-								<p class="text-center text-(--text-tertiary) absolute flex items-center justify-center w-full h-full">
-									{emptyMessage()}
-								</p>
-							</Show>
-							<ul class="flex flex-col w-full text-(--text-primary)">
-								<For each={visibleRecordings()}>
-									{(recording) => (
-										<RecordingItem
-											recording={recording}
-											onClick={() => handleRecordingClick(recording)}
-											onOpenFolder={() => handleOpenFolder(recording)}
-											onOpenEditor={() => handleOpenEditor(recording.path)}
-											onCopyVideoToClipboard={() =>
-												handleCopyVideoToClipboard(recording.path)
-											}
-											uploadProgress={
-												recording.meta.upload &&
-												(recording.meta.upload.state === "MultipartUpload" ||
-													recording.meta.upload.state === "SinglePartUpload")
-													? uploadProgress[recording.meta.upload.video_id]
-													: undefined
-											}
-										/>
-									)}
-								</For>
-							</ul>
-							<Show when={hasMoreRecordings()}>
-								<div class="flex justify-center p-3 border-t border-gray-3">
+										onKeyDown={(event) => {
+											if (event.key === "Enter") void createCourse();
+										}}
+										placeholder="New course"
+										aria-label="New course name"
+									/>
 									<Button
 										variant="gray"
 										size="sm"
-										onClick={() =>
-											setVisibleCount((count) =>
-												Math.min(
-													count + PAGE_SIZE,
-													filteredRecordings().length,
-												),
-											)
-										}
+										class="h-8 px-2"
+										disabled={!newCourseName().trim()}
+										onClick={createCourse}
+										aria-label="Create course"
 									>
-										Load more
+										<IconLucideFolderPlus class="size-3.5" />
 									</Button>
 								</div>
-							</Show>
+								<Show when={selectedCourse()}>
+									<div class="flex gap-1.5">
+										<Input
+											value={newModuleName()}
+											onInput={(event) =>
+												setNewModuleName(event.currentTarget.value)
+											}
+											onKeyDown={(event) => {
+												if (event.key === "Enter") void createModule();
+											}}
+											placeholder="New module"
+											aria-label="New module name"
+										/>
+										<Button
+											variant="gray"
+											size="sm"
+											class="h-8 px-2"
+											disabled={!newModuleName().trim()}
+											onClick={createModule}
+											aria-label="Create module"
+										>
+											<IconLucidePlus class="size-3.5" />
+										</Button>
+									</div>
+								</Show>
+							</div>
+						</aside>
+
+						<div class="flex min-w-0 flex-1 flex-col">
+							<div class="flex flex-col gap-3 border-b border-gray-3 p-4">
+								<div class="flex flex-wrap gap-3 items-center">
+									<For each={Tabs}>
+										{(tab) => (
+											<button
+												type="button"
+												class={cx(
+													"flex gap-1.5 items-center transition-colors duration-200 p-2 px-3 border rounded-full",
+													activeTab() === tab.id
+														? "bg-gray-5 cursor-default border-gray-5"
+														: "bg-transparent cursor-pointer hover:bg-gray-3 border-gray-5",
+												)}
+												onClick={() => setActiveTab(tab.id)}
+											>
+												{tab.icon && tab.icon}
+												<span class="text-xs text-gray-12">{tab.label}</span>
+											</button>
+										)}
+									</For>
+								</div>
+								<div class="relative w-full max-w-[260px] h-[36px] flex items-center">
+									<IconLucideSearch class="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none size-3 text-gray-10" />
+									<Input
+										type="search"
+										class="py-2 pl-6 h-full w-full"
+										value={search()}
+										onInput={(event) => setSearch(event.currentTarget.value)}
+										onKeyDown={(event) => {
+											if (event.key === "Escape" && search()) {
+												event.preventDefault();
+												setSearch("");
+											}
+										}}
+										placeholder="Search"
+										autoCapitalize="off"
+										autocorrect="off"
+										autocomplete="off"
+										spellcheck={false}
+										aria-label="Search recordings"
+									/>
+								</div>
+							</div>
+
+							<div class="relative flex flex-1 flex-col overflow-y-auto">
+								<Show when={filteredRecordings().length === 0}>
+									<p class="absolute flex h-full w-full items-center justify-center text-center text-(--text-tertiary)">
+										{emptyMessage()}
+									</p>
+								</Show>
+								<ul class="flex flex-col w-full text-(--text-primary)">
+									<For each={visibleRecordings()}>
+										{(recording) => (
+											<RecordingItem
+												recording={recording}
+												courses={courses()}
+												assignment={assignments()[recording.path]}
+												onAssignmentChange={(assignment) =>
+													assignRecording(recording.path, assignment)
+												}
+												onClick={() => handleRecordingClick(recording)}
+												onOpenFolder={() => handleOpenFolder(recording)}
+												onOpenEditor={() => handleOpenEditor(recording.path)}
+												onCopyVideoToClipboard={() =>
+													handleCopyVideoToClipboard(recording.path)
+												}
+												uploadProgress={
+													recording.meta.upload &&
+													(recording.meta.upload.state === "MultipartUpload" ||
+														recording.meta.upload.state === "SinglePartUpload")
+														? uploadProgress[recording.meta.upload.video_id]
+														: undefined
+												}
+											/>
+										)}
+									</For>
+								</ul>
+								<Show when={hasMoreRecordings()}>
+									<div class="flex justify-center p-3 border-t border-gray-3">
+										<Button
+											variant="gray"
+											size="sm"
+											onClick={() =>
+												setVisibleCount((count) =>
+													Math.min(
+														count + PAGE_SIZE,
+														filteredRecordings().length,
+													),
+												)
+											}
+										>
+											Load more
+										</Button>
+									</div>
+								</Show>
+							</div>
 						</div>
-					</Show>
+					</div>
 				</Section>
 			</SettingsPageContent>
 		</div>
 	);
 }
 
+function LibraryFolderButton(props: {
+	label: string;
+	selected: boolean;
+	onClick: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			class={cx(
+				"flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-xs transition-colors",
+				props.selected
+					? "bg-gray-5 text-gray-12"
+					: "text-gray-11 hover:bg-gray-3 hover:text-gray-12",
+			)}
+			onClick={props.onClick}
+		>
+			<IconLucideFolder class="size-3.5 shrink-0" />
+			<span class="truncate">{props.label}</span>
+		</button>
+	);
+}
+
 function RecordingItem(props: {
 	recording: Recording;
+	courses: Course[];
+	assignment: CourseAssignment | undefined;
+	onAssignmentChange: (assignment: CourseAssignment | undefined) => void;
 	onClick: () => void;
 	onOpenFolder: () => void;
 	onOpenEditor: () => void;
@@ -417,6 +676,12 @@ function RecordingItem(props: {
 				</div>
 			</div>
 			<div class="flex gap-2 items-center">
+				<CourseFolderSelect
+					courses={props.courses}
+					assignment={props.assignment}
+					onChange={props.onAssignmentChange}
+					disabled={props.recording.meta.status.status === "InProgress"}
+				/>
 				<Show when={mode() === "studio"}>
 					<Show when={props.uploadProgress}>
 						<CapTooltip content={`${(props.uploadProgress || 0).toFixed(2)}%`}>
@@ -518,6 +783,7 @@ function RecordingItem(props: {
 						if (!(await ask("Are you sure you want to delete this recording?")))
 							return;
 						await remove(props.recording.path, { recursive: true });
+						await assignRecording(props.recording.path, undefined);
 
 						queryClient.refetchQueries(recordingsQuery);
 					}}

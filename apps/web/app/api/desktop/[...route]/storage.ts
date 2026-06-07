@@ -41,6 +41,10 @@ const GoogleDriveOAuthState = z.object({
 });
 
 const googleDriveProvider = "googleDrive";
+const googleDriveCallbackUrl = () =>
+	`${serverEnv().WEB_URL}/api/desktop/storage/google-drive/callback`;
+const googleDriveConfigured = () =>
+	Boolean(serverEnv().GOOGLE_CLIENT_ID && serverEnv().GOOGLE_CLIENT_SECRET);
 
 const RefreshStorageQuotaQuery = z.object({
 	refreshStorageQuota: z
@@ -225,6 +229,8 @@ protectedApp.get(
 				return c.json({
 					activeProvider: managedByOrganization.activeProvider,
 					managedByOrganization,
+					googleDriveConfigured: googleDriveConfigured(),
+					googleDriveCallbackUrl: googleDriveCallbackUrl(),
 					googleDrive:
 						drive && managedByOrganization.activeProvider === "googleDrive"
 							? {
@@ -258,6 +264,8 @@ protectedApp.get(
 			activeProvider:
 				drive?.active && drive.status === "active" ? "googleDrive" : "s3",
 			managedByOrganization: null,
+			googleDriveConfigured: googleDriveConfigured(),
+			googleDriveCallbackUrl: googleDriveCallbackUrl(),
 			googleDrive: drive
 				? {
 						id: drive.id,
@@ -287,6 +295,9 @@ protectedApp.post(
 		const { orgId } = c.req.valid("json");
 		if (!userIsPro(user)) {
 			return c.json({ error: "upgrade_required" }, { status: 403 });
+		}
+		if (!googleDriveConfigured()) {
+			return c.json({ error: "google_drive_not_configured" }, { status: 503 });
 		}
 
 		if (orgId) {

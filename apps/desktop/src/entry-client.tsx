@@ -1,5 +1,6 @@
 // @refresh reload
 import { mount, StartClient } from "@solidjs/start/client";
+import { initializeBrowserPreview } from "./utils/browser-preview";
 
 function initPlatformClass() {
 	import("@tauri-apps/plugin-os")
@@ -13,6 +14,7 @@ function initPlatformClass() {
 }
 
 function initApp() {
+	initializeBrowserPreview();
 	const app = document.getElementById("app");
 	if (!app) throw new Error("App root element not found");
 

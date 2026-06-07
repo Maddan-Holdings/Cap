@@ -10,6 +10,7 @@ import { type as ostype } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import {
 	createEffect,
+	createMemo,
 	createSignal,
 	For,
 	Match,
@@ -22,12 +23,14 @@ import {
 } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
 import toast from "solid-toast";
+import { CourseFolderSelect } from "~/components/CourseFolderSelect";
 import { SignInButton } from "~/components/SignInButton";
 import Tooltip from "~/components/Tooltip";
 import CaptionControlsWindows11 from "~/components/titlebar/controls/CaptionControlsWindows11";
-import { authStore } from "~/store";
+import { authStore, courseLibraryStore } from "~/store";
 import { trackEvent } from "~/utils/analytics";
 import { createSignInMutation } from "~/utils/auth";
+import { assignRecording } from "~/utils/course-library";
 import {
 	beginExportSessionGuard,
 	createExportTask,
@@ -173,6 +176,11 @@ export function ExportPage() {
 	const projectPath = editorInstance.path;
 
 	const auth = authStore.createQuery();
+	const courseLibrary = courseLibraryStore.createQuery();
+	const courses = createMemo(() => courseLibrary.data?.courses ?? []);
+	const courseAssignment = createMemo(
+		() => courseLibrary.data?.assignments[projectPath],
+	);
 	const organizationSelection = createSelectedOrganization();
 	const organisations = organizationSelection.organizations;
 
@@ -1003,6 +1011,24 @@ export function ExportPage() {
 									</button>
 								</Show>
 							</Suspense>
+						</Field>
+
+						<Field
+							name="Course Folder"
+							icon={<IconLucideFolder class="size-4" />}
+						>
+							<CourseFolderSelect
+								courses={courses()}
+								assignment={courseAssignment()}
+								onChange={(assignment) =>
+									assignRecording(projectPath, assignment)
+								}
+								class="w-full"
+							/>
+							<p class="mt-1.5 text-[10px] text-gray-9">
+								The project stays in Cap's recordings storage and appears in
+								this folder in Course Library.
+							</p>
 						</Field>
 
 						<Field name="Format" icon={<IconLucideVideo class="size-4" />}>

@@ -90,6 +90,7 @@ export default function GoogleDriveConfigPage() {
 	const storageQuota = () => googleDrive()?.storageQuota ?? null;
 	const isConnected = () => googleDrive()?.connected === true;
 	const isActive = () => storage()?.activeProvider === "googleDrive";
+	const isConfigured = () => storage()?.googleDriveConfigured !== false;
 	const managedByOrganization = () => storage()?.managedByOrganization ?? null;
 
 	const [s3Config, { mutate: setS3Config }] = createResource(
@@ -191,6 +192,12 @@ export default function GoogleDriveConfigPage() {
 			if (response.status === 403) {
 				await commands.showWindow("Upgrade");
 				return null;
+			}
+
+			if (response.status === 503) {
+				throw new Error(
+					`Google Drive is not configured on this Cap server. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, then register this callback URL in Google Cloud: ${storage()?.googleDriveCallbackUrl}`,
+				);
 			}
 
 			if (response.status !== 200)
@@ -298,6 +305,22 @@ export default function GoogleDriveConfigPage() {
 									)}
 								</Show>
 
+								<Show when={!isConfigured()}>
+									<div class="rounded-lg border border-amber-6 bg-amber-3/30 px-3 py-3">
+										<p class="text-[13px] font-medium text-amber-11">
+											Google OAuth is not configured
+										</p>
+										<p class="mt-1 text-xs leading-relaxed text-amber-11">
+											Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the Cap
+											web server, then add this authorized redirect URI in
+											Google Cloud:
+										</p>
+										<code class="mt-2 block select-text break-all rounded-md bg-gray-2 px-2 py-1.5 text-[11px] text-gray-12">
+											{storage()?.googleDriveCallbackUrl}
+										</code>
+									</div>
+								</Show>
+
 								<div class="space-y-3">
 									<div class="flex justify-between items-start gap-4">
 										<div class="flex flex-col gap-0.5 min-w-0">
@@ -328,7 +351,7 @@ export default function GoogleDriveConfigPage() {
 										fallback={
 											<Button
 												variant="primary"
-												disabled={busy()}
+												disabled={busy() || !isConfigured()}
 												onClick={() => connect.mutate()}
 											>
 												{isWaitingForConnection()

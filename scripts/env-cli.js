@@ -141,6 +141,42 @@ async function main() {
 		}
 
 		envs.NEXT_PUBLIC_WEB_URL = envs.WEB_URL;
+
+		const configureGoogleOAuth = await confirm({
+			message:
+				"Configure Google OAuth for Google sign-in and Google Drive storage?",
+			initialValue: Boolean(
+				allEnvs.GOOGLE_CLIENT_ID && allEnvs.GOOGLE_CLIENT_SECRET,
+			),
+		});
+
+		if (isCancel(configureGoogleOAuth)) return;
+		if (configureGoogleOAuth) {
+			const googleOAuthValues = await group(
+				{
+					GOOGLE_CLIENT_ID: () =>
+						text({
+							message: "GOOGLE_CLIENT_ID",
+							placeholder: allEnvs.GOOGLE_CLIENT_ID,
+							defaultValue: allEnvs.GOOGLE_CLIENT_ID,
+							validate: (value) =>
+								value?.trim() ? undefined : "Google client ID is required",
+						}),
+					GOOGLE_CLIENT_SECRET: () =>
+						text({
+							message: "GOOGLE_CLIENT_SECRET",
+							placeholder: allEnvs.GOOGLE_CLIENT_SECRET,
+							defaultValue: allEnvs.GOOGLE_CLIENT_SECRET,
+							validate: (value) =>
+								value?.trim() ? undefined : "Google client secret is required",
+						}),
+				},
+				{ onCancel: () => process.exit(0) },
+			);
+
+			envs.GOOGLE_CLIENT_ID = googleOAuthValues.GOOGLE_CLIENT_ID.trim();
+			envs.GOOGLE_CLIENT_SECRET = googleOAuthValues.GOOGLE_CLIENT_SECRET.trim();
+		}
 	}
 
 	if (hasDesktop) {

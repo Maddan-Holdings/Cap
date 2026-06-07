@@ -58,6 +58,8 @@ export const ManagedOrganizationStorage = z
 export const DesktopStorageIntegrations = z.object({
 	activeProvider: z.enum(["s3", "googleDrive"]),
 	managedByOrganization: ManagedOrganizationStorage,
+	googleDriveConfigured: z.boolean(),
+	googleDriveCallbackUrl: z.string(),
 	googleDrive: z.object({
 		id: z.string().nullable(),
 		connected: z.boolean(),
@@ -234,6 +236,9 @@ const protectedContract = c.router(
 			responses: {
 				200: z.object({ url: z.string() }),
 				403: z.object({ error: z.literal("upgrade_required") }),
+				503: z.object({
+					error: z.literal("google_drive_not_configured"),
+				}),
 			},
 		},
 		testGoogleDriveStorage: {
