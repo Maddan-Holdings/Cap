@@ -8,10 +8,28 @@ import IconLucideMonitor from "~icons/lucide/monitor";
 import IconLucideScissors from "~icons/lucide/scissors";
 import IconLucideShare2 from "~icons/lucide/share-2";
 import IconLucideSquarePlay from "~icons/lucide/square-play";
+import IconLucideTerminal from "~icons/lucide/terminal";
 import IconLucideVideo from "~icons/lucide/video";
 import { Section, SectionCard, SettingsPageContent } from "./Setting";
 
 const guides = [
+	{
+		id: "vscode-preview",
+		title: "Run Cap in the VS Code editor",
+		description:
+			"This project is configured to start its browser preview automatically when you open the folder in VS Code.",
+		icon: IconLucideTerminal,
+		steps: [
+			"Open the Cap project folder in VS Code.",
+			"If VS Code asks whether automatic tasks are allowed, choose Allow.",
+			"Wait for the Cap: Desktop Preview task to start. It runs the existing Cap desktop web UI on port 3002.",
+			"VS Code should open Cap in an editor Preview tab automatically.",
+			"If the preview does not open, open the Ports panel, find port 3002, and choose Open in Preview.",
+			"You can also open http://127.0.0.1:3002 inside VS Code's Simple Browser.",
+			"Keep the preview task running while you edit. Changes should appear automatically.",
+			"Remember that screen recording, camera access, file dialogs, and Google sign-in require the rebuilt Tauri desktop app. The editor preview simulates native features so you can inspect the UI.",
+		],
+	},
 	{
 		id: "record",
 		title: "Record your screen",
