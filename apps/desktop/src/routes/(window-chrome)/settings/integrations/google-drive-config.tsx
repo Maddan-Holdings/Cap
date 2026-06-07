@@ -1,6 +1,8 @@
 import { Button } from "@cap/ui-solid";
+import type { DesktopStorageIntegrations } from "@cap/web-api-contract";
 import { useMutation } from "@tanstack/solid-query";
 import { createResource, createSignal, Show, Suspense } from "solid-js";
+import { isBrowserPreview } from "~/utils/browser-preview";
 import { createSelectedOrganization } from "~/utils/organization-branding";
 import { commands } from "~/utils/tauri";
 import { apiClient, protectedHeaders } from "~/utils/web-api";
@@ -10,6 +12,21 @@ import { IntegrationConfigHeader } from "./config-header";
 const byteUnits = ["B", "KB", "MB", "GB", "TB", "PB"] as const;
 const googleDriveConnectionPollIntervalMs = 1500;
 const googleDriveConnectionPollTimeoutMs = 120000;
+const browserPreviewStorage = {
+	activeProvider: "s3",
+	managedByOrganization: null,
+	googleDriveConfigured: false,
+	googleDriveCallbackUrl:
+		"http://localhost:3000/api/desktop/storage/google-drive/callback",
+	googleDrive: {
+		id: null,
+		connected: false,
+		active: false,
+		status: null,
+		displayName: null,
+		storageQuota: null,
+	},
+} satisfies DesktopStorageIntegrations;
 
 const formatBytes = (value?: string | null) => {
 	if (!value) return null;
@@ -48,6 +65,8 @@ const fetchStorageIntegrations = async (
 	orgId: string | null,
 	refreshStorageQuota = false,
 ) => {
+	if (isBrowserPreview()) return browserPreviewStorage;
+
 	const response = await apiClient.desktop.getStorageIntegrations({
 		query:
 			refreshStorageQuota || orgId
@@ -66,6 +85,21 @@ const fetchStorageIntegrations = async (
 };
 
 const fetchS3Config = async (orgId: string | null) => {
+	if (isBrowserPreview()) {
+		return {
+			config: {
+				provider: "aws",
+				accessKeyId: "",
+				secretAccessKey: "",
+				endpoint: "",
+				bucketName: "",
+				region: "",
+			},
+			source: "default" as const,
+			managedByOrganization: null,
+		};
+	}
+
 	const response = await apiClient.desktop.getS3Config({
 		query: orgId ? { orgId } : undefined,
 		headers: await protectedHeaders(),

@@ -5,6 +5,7 @@ import IconLucideDatabase from "~icons/lucide/database";
 
 import "@total-typescript/ts-reset/filter-boolean";
 import { authStore } from "~/store";
+import { isBrowserPreview } from "~/utils/browser-preview";
 import { createSelectedOrganization } from "~/utils/organization-branding";
 import { commands } from "~/utils/tauri";
 import { apiClient, protectedHeaders } from "~/utils/web-api";
@@ -62,7 +63,7 @@ export default function AppsTab() {
 		},
 	);
 
-	const isPro = () => auth.data?.plan?.upgraded;
+	const isPro = () => isBrowserPreview() || auth.data?.plan?.upgraded;
 	const managedByOrganization = () => storage()?.managedByOrganization ?? null;
 
 	onMount(() => {

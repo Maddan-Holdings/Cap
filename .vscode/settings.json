@@ -1,4 +1,12 @@
 {
+	"remote.autoForwardPorts": true,
+	"remote.portsAttributes": {
+		"3002": {
+			"label": "Cap Desktop Preview",
+			"onAutoForward": "openPreview"
+		}
+	},
 	"rust-analyzer.cargo.targetDir": "target/rust-analyzer",
-	"rust-analyzer.check.allTargets": false
+	"rust-analyzer.check.allTargets": false,
+	"task.allowAutomaticTasks": "on"
 }

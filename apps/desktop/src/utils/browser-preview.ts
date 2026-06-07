@@ -1,10 +1,17 @@
 import type { InvokeArgs } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { RecordingMetaWithMetadata } from "./tauri";
+import type {
+	CurrentRecording,
+	RecordingMetaWithMetadata,
+	ScreenCaptureTarget,
+	StartRecordingInputs,
+} from "./tauri";
 
 const STORE_KEY = "cap-browser-preview-store";
 const STORE_RID = 1;
+const PREVIEW_DISPLAY_ID = "preview-display";
+const RECORDING_OPTIONS_KEY = "recording-options-query-2";
 const THUMBNAIL_DATA_URL = `data:image/svg+xml,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180">
 	<defs>
@@ -69,6 +76,100 @@ const sampleRecordings: Array<[string, RecordingMetaWithMetadata]> = [
 	],
 ];
 
+type BrowserPreviewWindow = typeof window & {
+	__CAP_BROWSER_PREVIEW__?: boolean;
+};
+
+let currentRecording: CurrentRecording | null = null;
+
+export function isBrowserPreview() {
+	return (
+		typeof window !== "undefined" &&
+		(window as BrowserPreviewWindow).__CAP_BROWSER_PREVIEW__ === true
+	);
+}
+
+function navigatePreview(path: string) {
+	if (location.pathname + location.search === path) return;
+	history.pushState(null, "", path);
+	window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+function openTargetSelectOverlay(
+	targetMode: string | null | undefined,
+	displayId: string | null | undefined,
+) {
+	const params = new URLSearchParams({
+		displayId: displayId || PREVIEW_DISPLAY_ID,
+		isHoveredDisplay: "true",
+		targetMode: targetMode || "display",
+	});
+	navigatePreview(`/target-select-overlay?${params.toString()}`);
+}
+
+function showPreviewWindow(value: unknown) {
+	if (value === "Onboarding") {
+		navigatePreview("/onboarding");
+		return;
+	}
+	if (value === "ModeSelect") {
+		navigatePreview("/mode-select");
+		return;
+	}
+	if (value === "Upgrade") {
+		navigatePreview("/upgrade");
+		return;
+	}
+	if (!value || typeof value !== "object" || Array.isArray(value)) return;
+
+	const windowValue = value as Record<string, unknown>;
+	if ("Main" in windowValue) {
+		navigatePreview("/");
+		return;
+	}
+	if ("Settings" in windowValue) {
+		const settings = windowValue.Settings;
+		const page =
+			settings && typeof settings === "object" && !Array.isArray(settings)
+				? (settings as Record<string, unknown>).page
+				: null;
+		navigatePreview(
+			typeof page === "string" ? `/settings/${page}` : "/settings/general",
+		);
+		return;
+	}
+	if ("TargetSelectOverlay" in windowValue) {
+		const overlay = windowValue.TargetSelectOverlay;
+		if (!overlay || typeof overlay !== "object" || Array.isArray(overlay))
+			return;
+		const args = overlay as Record<string, unknown>;
+		openTargetSelectOverlay(
+			typeof args.target_mode === "string" ? args.target_mode : null,
+			typeof args.display_id === "string" ? args.display_id : null,
+		);
+	}
+}
+
+function toCurrentRecordingTarget(
+	target: ScreenCaptureTarget,
+): CurrentRecording["target"] {
+	switch (target.variant) {
+		case "display":
+			return { screen: { id: target.id } };
+		case "window":
+			return { window: { id: target.id, bounds: null } };
+		case "area":
+			return {
+				area: {
+					screen: target.screen,
+					bounds: target.bounds,
+				},
+			};
+		case "cameraOnly":
+			return "camera";
+	}
+}
+
 function readStore() {
 	const stored = localStorage.getItem(STORE_KEY);
 	if (!stored) {
@@ -103,6 +204,42 @@ function readStore() {
 
 function writeStore(store: Record<string, unknown>) {
 	localStorage.setItem(STORE_KEY, JSON.stringify(store));
+}
+
+function initializePreviewRecordingSettings() {
+	const store = readStore();
+	const recordingSettings =
+		store.recording_settings &&
+		typeof store.recording_settings === "object" &&
+		!Array.isArray(store.recording_settings)
+			? (store.recording_settings as Record<string, unknown>)
+			: {};
+	store.recording_settings = {
+		...recordingSettings,
+		target: { variant: "display", id: PREVIEW_DISPLAY_ID },
+		mode: "studio",
+	};
+	writeStore(store);
+
+	const storedOptions = localStorage.getItem(RECORDING_OPTIONS_KEY);
+	let recordingOptions: Record<string, unknown> = {};
+	if (storedOptions) {
+		try {
+			const parsed = JSON.parse(storedOptions) as unknown;
+			if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+				recordingOptions = parsed as Record<string, unknown>;
+			}
+		} catch {}
+	}
+	localStorage.setItem(
+		RECORDING_OPTIONS_KEY,
+		JSON.stringify({
+			...recordingOptions,
+			captureTarget: { variant: "display", id: PREVIEW_DISPLAY_ID },
+			mode: "studio",
+			targetMode: null,
+		}),
+	);
 }
 
 async function handleStoreCommand(
@@ -169,7 +306,10 @@ async function handleStoreCommand(
 }
 
 export function initializeBrowserPreview() {
-	if ("__TAURI_INTERNALS__" in window) return false;
+	if ("__TAURI_INTERNALS__" in window) return isBrowserPreview();
+
+	(window as BrowserPreviewWindow).__CAP_BROWSER_PREVIEW__ = true;
+	initializePreviewRecordingSettings();
 
 	Object.assign(window, {
 		__TAURI_OS_PLUGIN_INTERNALS__: {
@@ -211,10 +351,109 @@ export function initializeBrowserPreview() {
 			}
 			if (command.startsWith("plugin:window|")) return null;
 			if (command.startsWith("plugin:resources|")) return null;
-			if (command === "get_current_recording") return null;
+			if (command === "get_current_recording") return [currentRecording];
 			if (command === "get_general_settings") return null;
 			if (command === "list_capture_windows") return [];
+			if (command === "list_capture_displays") {
+				return [
+					{
+						id: PREVIEW_DISPLAY_ID,
+						name: "Editor Preview",
+						refresh_rate: 60,
+					},
+				];
+			}
+			if (command === "list_displays_with_thumbnails") {
+				return [
+					{
+						id: PREVIEW_DISPLAY_ID,
+						name: "Editor Preview",
+						refresh_rate: 60,
+						thumbnail: THUMBNAIL_DATA_URL,
+					},
+				];
+			}
+			if (command === "list_windows_with_thumbnails") return [];
 			if (command === "get_default_excluded_windows") return [];
+			if (command === "display_information") {
+				return {
+					name: "Editor Preview",
+					physical_size: { width: 1920, height: 1080 },
+					logical_size: { width: 1280, height: 720 },
+					logical_bounds: {
+						position: { x: 0, y: 0 },
+						size: { width: 1280, height: 720 },
+					},
+					refresh_rate: "60",
+				};
+			}
+			if (command === "do_permissions_check") {
+				return {
+					screenRecording: "granted",
+					microphone: "granted",
+					camera: "granted",
+					accessibility: "granted",
+				};
+			}
+			if (command === "get_devices_snapshot") {
+				return {
+					cameras: [],
+					microphones: [],
+					permissions: {
+						screenRecording: "granted",
+						microphone: "granted",
+						camera: "granted",
+						accessibility: "granted",
+					},
+				};
+			}
+			if (command === "is_system_audio_capture_supported") return true;
+			if (command === "open_target_select_overlays") {
+				const args = payload as Record<string, unknown> | undefined;
+				openTargetSelectOverlay(
+					typeof args?.targetMode === "string" ? args.targetMode : null,
+					typeof args?.specificDisplayId === "string"
+						? args.specificDisplayId
+						: null,
+				);
+				return null;
+			}
+			if (command === "close_target_select_overlays") {
+				if (location.pathname === "/target-select-overlay") {
+					navigatePreview("/");
+				}
+				return null;
+			}
+			if (command === "show_window") {
+				const args = payload as Record<string, unknown> | undefined;
+				showPreviewWindow(args?.window);
+				return null;
+			}
+			if (command === "start_recording") {
+				const args = payload as Record<string, unknown> | undefined;
+				const inputs = args?.inputs as StartRecordingInputs | undefined;
+				if (inputs) {
+					currentRecording = {
+						target: toCurrentRecordingTarget(inputs.capture_target),
+						mode: inputs.mode,
+						status: "recording",
+					};
+					queueMicrotask(() => {
+						navigatePreview("/");
+						void emit("current-recording-changed", null);
+						void emit("recording-started", null);
+					});
+				}
+				return "Started";
+			}
+			if (command === "stop_recording") {
+				currentRecording = null;
+				queueMicrotask(() => {
+					void emit("current-recording-changed", null);
+					void emit("recording-stopped", null);
+				});
+				return null;
+			}
 			return null;
 		},
 		{ shouldMockEvents: true },
@@ -228,10 +467,6 @@ export function initializeBrowserPreview() {
 		}
 	).__TAURI_INTERNALS__;
 	internals.convertFileSrc = () => THUMBNAIL_DATA_URL;
-
-	if (location.pathname === "/") {
-		history.replaceState(null, "", "/settings/recordings");
-	}
 
 	return true;
 }

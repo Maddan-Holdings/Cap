@@ -88,6 +88,12 @@ Additionally, `unused_must_use = "deny"` applies to all Rust code: every `Result
 - macOS note: desktop permissions (screen/mic) apply to the terminal running `pnpm dev:desktop`.
 - All other agent-facing rules (comments policy, no editing generated files, clippy/Biome shape, post-edit gates) live in **Pre-Generation Invariants** at the top of this file.
 
+## Upstream Cap Extension Invariant
+- Keep Cap's recorder, target selection, editor, timeline, captions, trimming, export, sharing, and native desktop architecture sourced from the official Cap open-source implementation.
+- Extend existing Cap routes, components, stores, commands, and design patterns instead of creating replacement recorder or editor interfaces.
+- Preserve the Course Library/folder system and Google Drive integration as intentional extensions.
+- Browser preview code may bridge or simulate unavailable Tauri APIs, but it must render Cap's existing UI routes rather than duplicate them.
+
 ## Effect Usage
 - Next.js API routes in `apps/web/app/api/*` are built with `@effect/platform`'s `HttpApi` builder; copy the existing class/group/endpoint pattern instead of ad-hoc handlers.
 - Acquire backend services (e.g., `Videos`, `S3Buckets`) inside `Effect.gen` blocks and wire them through `Layer.provide`/`HttpApiBuilder.group`, translating domain errors to `HttpApiError` variants.

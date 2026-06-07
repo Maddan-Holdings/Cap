@@ -23,8 +23,10 @@ import { SignInButton } from "~/components/SignInButton";
 import { authStore, userProfileStore } from "~/store";
 import { trackEvent } from "~/utils/analytics";
 import { createSignInMutation } from "~/utils/auth";
+import { isBrowserPreview } from "~/utils/browser-preview";
 import { clientEnv } from "~/utils/env";
 import { apiClient, protectedHeaders } from "~/utils/web-api";
+import IconLucideCloud from "~icons/lucide/cloud";
 import IconLucideTerminal from "~icons/lucide/terminal";
 import IconLucideUserRound from "~icons/lucide/user-round";
 
@@ -188,6 +190,15 @@ export default function Settings(props: RouteSectionProps) {
 		},
 	}));
 	const settingsItems = [
+		...(isBrowserPreview()
+			? [
+					{
+						href: "/",
+						name: "Recorder",
+						icon: IconLucideVideo,
+					},
+				]
+			: []),
 		{
 			href: "general",
 			name: "General",
@@ -223,6 +234,15 @@ export default function Settings(props: RouteSectionProps) {
 			name: "Integrations",
 			icon: IconLucideUnplug,
 		},
+		...(isBrowserPreview()
+			? [
+					{
+						href: "integrations/google-drive-config",
+						name: "Google Drive",
+						icon: IconLucideCloud,
+					},
+				]
+			: []),
 		{
 			href: "license",
 			name: "License",
@@ -481,6 +501,7 @@ export default function Settings(props: RouteSectionProps) {
 							<li>
 								<A
 									href={item.href}
+									end={item.href === "/"}
 									activeClass="bg-gray-5 pointer-events-none"
 									class="cap-settings-nav-item rounded-lg h-8 hover:bg-gray-3 text-[13px] px-2 flex flex-row items-center gap-1.5 transition-colors"
 								>
