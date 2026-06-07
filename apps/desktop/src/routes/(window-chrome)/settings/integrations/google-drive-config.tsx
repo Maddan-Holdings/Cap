@@ -2,6 +2,8 @@ import { Button } from "@cap/ui-solid";
 import type { DesktopStorageIntegrations } from "@cap/web-api-contract";
 import { useMutation } from "@tanstack/solid-query";
 import { createResource, createSignal, Show, Suspense } from "solid-js";
+import { SignInButton } from "~/components/SignInButton";
+import { authStore } from "~/store";
 import { isBrowserPreview } from "~/utils/browser-preview";
 import { createSelectedOrganization } from "~/utils/organization-branding";
 import { commands } from "~/utils/tauri";
@@ -111,13 +113,18 @@ const fetchS3Config = async (orgId: string | null) => {
 };
 
 export default function GoogleDriveConfigPage() {
+	const auth = authStore.createQuery();
 	const organizationSelection = createSelectedOrganization();
+	const canLoadIntegration = () => isBrowserPreview() || !!auth.data;
 	const [isWaitingForConnection, setIsWaitingForConnection] =
 		createSignal(false);
 	const [isRefreshing, setIsRefreshing] = createSignal(false);
 	const [storage, { mutate: setStorage }] = createResource(
-		() => organizationSelection.selectedOrganizationId(),
-		(orgId) => fetchStorageIntegrations(orgId),
+		() =>
+			canLoadIntegration()
+				? (organizationSelection.selectedOrganizationId() ?? "")
+				: false,
+		(orgId) => fetchStorageIntegrations(orgId || null),
 	);
 
 	const googleDrive = () => storage()?.googleDrive;
@@ -128,8 +135,11 @@ export default function GoogleDriveConfigPage() {
 	const managedByOrganization = () => storage()?.managedByOrganization ?? null;
 
 	const [s3Config, { mutate: setS3Config }] = createResource(
-		() => organizationSelection.selectedOrganizationId(),
-		(orgId) => fetchS3Config(orgId),
+		() =>
+			canLoadIntegration()
+				? (organizationSelection.selectedOrganizationId() ?? "")
+				: false,
+		(orgId) => fetchS3Config(orgId || null),
 	);
 
 	const hasS3Config = () => {
@@ -323,186 +333,203 @@ export default function GoogleDriveConfigPage() {
 					description="Google Drive stores new uploads in a private Cap folder in your Drive. Existing Cap-hosted and S3 videos keep using their current storage."
 				>
 					<SectionCard padded class="custom-scroll">
-						<Suspense
+						<Show
+							when={canLoadIntegration()}
 							fallback={
-								<div class="flex justify-center items-center w-full h-screen">
-									<IconCapLogo class="animate-spin size-16" />
+								<div class="flex flex-col items-start gap-3">
+									<div class="space-y-1">
+										<p class="text-[13px] font-medium text-gray-12">
+											Sign in to connect Google Drive
+										</p>
+										<p class="text-xs leading-relaxed text-gray-10">
+											Google Drive connections belong to your Cap account.
+										</p>
+									</div>
+									<SignInButton>Sign In</SignInButton>
 								</div>
 							}
 						>
-							<div class="space-y-4 animate-in fade-in">
-								<Show when={managedByOrganization()}>
-									{(organization) => (
-										<p class="text-xs leading-relaxed text-gray-10">
-											Managed by your organization: {organization().name}
-										</p>
-									)}
-								</Show>
-
-								<Show when={!isConfigured()}>
-									<div class="rounded-lg border border-amber-6 bg-amber-3/30 px-3 py-3">
-										<p class="text-[13px] font-medium text-amber-11">
-											Google OAuth is not configured
-										</p>
-										<p class="mt-1 text-xs leading-relaxed text-amber-11">
-											Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the Cap
-											web server, then add this authorized redirect URI in
-											Google Cloud:
-										</p>
-										<code class="mt-2 block select-text break-all rounded-md bg-gray-2 px-2 py-1.5 text-[11px] text-gray-12">
-											{storage()?.googleDriveCallbackUrl}
-										</code>
+							<Suspense
+								fallback={
+									<div class="flex justify-center items-center min-h-40">
+										<IconCapLogo class="animate-spin size-16" />
 									</div>
-								</Show>
+								}
+							>
+								<div class="space-y-4 animate-in fade-in">
+									<Show when={managedByOrganization()}>
+										{(organization) => (
+											<p class="text-xs leading-relaxed text-gray-10">
+												Managed by your organization: {organization().name}
+											</p>
+										)}
+									</Show>
 
-								<div class="space-y-3">
-									<div class="flex justify-between items-start gap-4">
-										<div class="flex flex-col gap-0.5 min-w-0">
-											<p class="text-[13px] text-gray-12">
-												{isConnected()
-													? googleDrive()?.displayName
-													: "Google Drive"}
+									<Show when={!isConfigured()}>
+										<div class="rounded-lg border border-amber-6 bg-amber-3/30 px-3 py-3">
+											<p class="text-[13px] font-medium text-amber-11">
+												Google OAuth is not configured
 											</p>
-											<p class="text-xs leading-snug text-gray-10">
-												{isConnected()
-													? isActive()
-														? "Active for new uploads"
-														: "Connected but not active"
-													: "Not connected"}
+											<p class="mt-1 text-xs leading-relaxed text-amber-11">
+												Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the Cap
+												web server, then add this authorized redirect URI in
+												Google Cloud:
 											</p>
+											<code class="mt-2 block select-text break-all rounded-md bg-gray-2 px-2 py-1.5 text-[11px] text-gray-12">
+												{storage()?.googleDriveCallbackUrl}
+											</code>
 										</div>
-										<Button
-											variant="gray"
-											disabled={busy()}
-											onClick={() => refetch()}
-										>
-											{isRefreshing() ? "Refreshing..." : "Refresh"}
-										</Button>
-									</div>
+									</Show>
 
-									<Show
-										when={isConnected()}
-										fallback={
+									<div class="space-y-3">
+										<div class="flex justify-between items-start gap-4">
+											<div class="flex flex-col gap-0.5 min-w-0">
+												<p class="text-[13px] text-gray-12">
+													{isConnected()
+														? googleDrive()?.displayName
+														: "Google Drive"}
+												</p>
+												<p class="text-xs leading-snug text-gray-10">
+													{isConnected()
+														? isActive()
+															? "Active for new uploads"
+															: "Connected but not active"
+														: "Not connected"}
+												</p>
+											</div>
 											<Button
-												variant="primary"
-												disabled={busy() || !isConfigured()}
-												onClick={() => connect.mutate()}
+												variant="gray"
+												disabled={busy()}
+												onClick={() => refetch()}
 											>
-												{isWaitingForConnection()
-													? "Waiting..."
-													: connect.isPending
-														? "Opening..."
-														: "Connect Google Drive"}
+												{isRefreshing() ? "Refreshing..." : "Refresh"}
 											</Button>
-										}
-									>
-										<Show when={storageQuota()}>
-											<div class="pt-3 space-y-2 border-t border-gray-3">
-												<div class="flex justify-between items-start gap-4">
-													<div class="flex flex-col gap-0.5 min-w-0">
-														<p class="text-[13px] text-gray-12">Storage</p>
-														<Show when={quotaUsageLabel()}>
+										</div>
+
+										<Show
+											when={isConnected()}
+											fallback={
+												<Button
+													variant="primary"
+													disabled={busy() || !isConfigured()}
+													onClick={() => connect.mutate()}
+												>
+													{isWaitingForConnection()
+														? "Waiting..."
+														: connect.isPending
+															? "Opening..."
+															: "Connect Google Drive"}
+												</Button>
+											}
+										>
+											<Show when={storageQuota()}>
+												<div class="pt-3 space-y-2 border-t border-gray-3">
+													<div class="flex justify-between items-start gap-4">
+														<div class="flex flex-col gap-0.5 min-w-0">
+															<p class="text-[13px] text-gray-12">Storage</p>
+															<Show when={quotaUsageLabel()}>
+																{(label) => (
+																	<p class="text-xs leading-snug text-gray-10">
+																		{label()}
+																	</p>
+																)}
+															</Show>
+														</div>
+														<Show when={quotaTimestampLabel()}>
 															{(label) => (
-																<p class="text-xs leading-snug text-gray-10">
+																<p class="text-[12px] text-gray-9 text-right">
 																	{label()}
 																</p>
 															)}
 														</Show>
 													</div>
-													<Show when={quotaTimestampLabel()}>
-														{(label) => (
-															<p class="text-[12px] text-gray-9 text-right">
-																{label()}
-															</p>
-														)}
+													<Show when={quotaUsagePercent() !== null}>
+														<div class="overflow-hidden h-1.5 rounded-full bg-gray-4">
+															<div
+																class="h-full rounded-full bg-blue-9"
+																style={{
+																	width: `${quotaUsagePercent() ?? 0}%`,
+																}}
+															/>
+														</div>
 													</Show>
-												</div>
-												<Show when={quotaUsagePercent() !== null}>
-													<div class="overflow-hidden h-1.5 rounded-full bg-gray-4">
-														<div
-															class="h-full rounded-full bg-blue-9"
-															style={{
-																width: `${quotaUsagePercent() ?? 0}%`,
-															}}
-														/>
+													<div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
+														<Show when={formatBytes(storageQuota()?.remaining)}>
+															{(remaining) => (
+																<>
+																	<p class="text-gray-10">Remaining</p>
+																	<p class="text-right text-gray-11">
+																		{remaining()}
+																	</p>
+																</>
+															)}
+														</Show>
+														<Show
+															when={formatBytes(storageQuota()?.usageInDrive)}
+														>
+															{(usageInDrive) => (
+																<>
+																	<p class="text-gray-10">Drive files</p>
+																	<p class="text-right text-gray-11">
+																		{usageInDrive()}
+																	</p>
+																</>
+															)}
+														</Show>
+														<Show
+															when={formatBytes(
+																storageQuota()?.usageInDriveTrash,
+															)}
+														>
+															{(usageInDriveTrash) => (
+																<>
+																	<p class="text-gray-10">Trash</p>
+																	<p class="text-right text-gray-11">
+																		{usageInDriveTrash()}
+																	</p>
+																</>
+															)}
+														</Show>
 													</div>
-												</Show>
-												<div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
-													<Show when={formatBytes(storageQuota()?.remaining)}>
-														{(remaining) => (
-															<>
-																<p class="text-gray-10">Remaining</p>
-																<p class="text-right text-gray-11">
-																	{remaining()}
-																</p>
-															</>
-														)}
-													</Show>
-													<Show
-														when={formatBytes(storageQuota()?.usageInDrive)}
-													>
-														{(usageInDrive) => (
-															<>
-																<p class="text-gray-10">Drive files</p>
-																<p class="text-right text-gray-11">
-																	{usageInDrive()}
-																</p>
-															</>
-														)}
-													</Show>
-													<Show
-														when={formatBytes(
-															storageQuota()?.usageInDriveTrash,
-														)}
-													>
-														{(usageInDriveTrash) => (
-															<>
-																<p class="text-gray-10">Trash</p>
-																<p class="text-right text-gray-11">
-																	{usageInDriveTrash()}
-																</p>
-															</>
-														)}
-													</Show>
 												</div>
-											</div>
-										</Show>
-										<div class="flex flex-wrap gap-2">
-											<Button
-												variant="primary"
-												disabled={busy() || isActive()}
-												onClick={() => setActive.mutate("googleDrive")}
-											>
-												{isActive() ? "Active" : "Use Google Drive"}
-											</Button>
-											<Show when={hasS3Config()}>
+											</Show>
+											<div class="flex flex-wrap gap-2">
+												<Button
+													variant="primary"
+													disabled={busy() || isActive()}
+													onClick={() => setActive.mutate("googleDrive")}
+												>
+													{isActive() ? "Active" : "Use Google Drive"}
+												</Button>
+												<Show when={hasS3Config()}>
+													<Button
+														variant="gray"
+														disabled={busy() || !isActive()}
+														onClick={() => setActive.mutate("s3")}
+													>
+														Use S3
+													</Button>
+												</Show>
 												<Button
 													variant="gray"
-													disabled={busy() || !isActive()}
-													onClick={() => setActive.mutate("s3")}
+													disabled={busy()}
+													onClick={() => testConnection.mutate()}
 												>
-													Use S3
+													{testConnection.isPending ? "Testing..." : "Test"}
 												</Button>
-											</Show>
-											<Button
-												variant="gray"
-												disabled={busy()}
-												onClick={() => testConnection.mutate()}
-											>
-												{testConnection.isPending ? "Testing..." : "Test"}
-											</Button>
-											<Button
-												variant="destructive"
-												disabled={busy()}
-												onClick={() => disconnect.mutate()}
-											>
-												Disconnect
-											</Button>
-										</div>
-									</Show>
+												<Button
+													variant="destructive"
+													disabled={busy()}
+													onClick={() => disconnect.mutate()}
+												>
+													Disconnect
+												</Button>
+											</div>
+										</Show>
+									</div>
 								</div>
-							</div>
-						</Suspense>
+							</Suspense>
+						</Show>
 					</SectionCard>
 				</Section>
 			</SettingsPageContent>

@@ -26,7 +26,9 @@ import { createSignInMutation } from "~/utils/auth";
 import { isBrowserPreview } from "~/utils/browser-preview";
 import { clientEnv } from "~/utils/env";
 import { apiClient, protectedHeaders } from "~/utils/web-api";
+import IconLucideCircleHelp from "~icons/lucide/circle-help";
 import IconLucideCloud from "~icons/lucide/cloud";
+import IconLucideFolder from "~icons/lucide/folder";
 import IconLucideTerminal from "~icons/lucide/terminal";
 import IconLucideUserRound from "~icons/lucide/user-round";
 
@@ -189,79 +191,90 @@ export default function Settings(props: RouteSectionProps) {
 			return response.body;
 		},
 	}));
-	const settingsItems = [
-		...(isBrowserPreview()
-			? [
-					{
-						href: "/",
-						name: "Recorder",
-						icon: IconLucideVideo,
-					},
-				]
-			: []),
+	const settingsGroups = [
 		{
-			href: "general",
-			name: "General",
-			icon: IconCapSettings,
+			label: "Workspace",
+			items: [
+				...(isBrowserPreview()
+					? [
+							{
+								href: "/",
+								name: "Recorder",
+								icon: IconLucideVideo,
+							},
+						]
+					: []),
+				{
+					href: "recordings",
+					name: "Course Library",
+					icon: IconLucideFolder,
+				},
+				{
+					href: "integrations/google-drive-config",
+					name: "Google Drive",
+					icon: IconLucideCloud,
+				},
+				{
+					href: "how-to",
+					name: "How To",
+					icon: IconLucideCircleHelp,
+				},
+			],
 		},
 		{
-			href: "hotkeys",
-			name: "Shortcuts",
-			icon: IconCapHotkeys,
-		},
-		{
-			href: "cli",
-			name: "CLI",
-			icon: IconLucideTerminal,
-		},
-		{
-			href: "recordings",
-			name: "Course Library",
-			icon: IconLucideSquarePlay,
-		},
-		{
-			href: "screenshots",
-			name: "Screenshots",
-			icon: IconLucideImage,
-		},
-		{
-			href: "transcription",
-			name: "Transcription",
-			icon: IconCapCaptions,
-		},
-		{
-			href: "integrations",
-			name: "Integrations",
-			icon: IconLucideUnplug,
-		},
-		...(isBrowserPreview()
-			? [
-					{
-						href: "integrations/google-drive-config",
-						name: "Google Drive",
-						icon: IconLucideCloud,
-					},
-				]
-			: []),
-		{
-			href: "license",
-			name: "License",
-			icon: IconLucideGift,
-		},
-		{
-			href: "experimental",
-			name: "Experimental",
-			icon: IconCapSettings,
-		},
-		{
-			href: "feedback",
-			name: "Feedback",
-			icon: IconLucideMessageSquarePlus,
-		},
-		{
-			href: "changelog",
-			name: "Changelog",
-			icon: IconLucideBell,
+			label: "Settings",
+			items: [
+				{
+					href: "general",
+					name: "General",
+					icon: IconCapSettings,
+				},
+				{
+					href: "hotkeys",
+					name: "Shortcuts",
+					icon: IconCapHotkeys,
+				},
+				{
+					href: "cli",
+					name: "CLI",
+					icon: IconLucideTerminal,
+				},
+				{
+					href: "screenshots",
+					name: "Screenshots",
+					icon: IconLucideImage,
+				},
+				{
+					href: "transcription",
+					name: "Transcription",
+					icon: IconCapCaptions,
+				},
+				{
+					href: "integrations",
+					name: "Integrations",
+					icon: IconLucideUnplug,
+				},
+				{
+					href: "license",
+					name: "License",
+					icon: IconLucideGift,
+				},
+				{
+					href: "experimental",
+					name: "Experimental",
+					icon: IconCapSettings,
+				},
+				{
+					href: "feedback",
+					name: "Feedback",
+					icon: IconLucideMessageSquarePlus,
+				},
+				{
+					href: "changelog",
+					name: "Changelog",
+					icon: IconLucideBell,
+				},
+			],
 		},
 	];
 	const accountName = createMemo(() => {
@@ -495,23 +508,37 @@ export default function Settings(props: RouteSectionProps) {
 						</p>
 					</div>
 				</button>
-				<ul class="cap-settings-nav min-w-48 h-full p-2.5 space-y-1 text-gray-12">
-					<For each={settingsItems}>
-						{(item) => (
-							<li>
-								<A
-									href={item.href}
-									end={item.href === "/"}
-									activeClass="bg-gray-5 pointer-events-none"
-									class="cap-settings-nav-item rounded-lg h-8 hover:bg-gray-3 text-[13px] px-2 flex flex-row items-center gap-1.5 transition-colors"
-								>
-									<item.icon class="opacity-60 size-4" aria-hidden="true" />
-									<span>{item.name}</span>
-								</A>
-							</li>
+				<nav class="cap-settings-nav min-w-48 flex-1 overflow-y-auto p-2.5 space-y-4 text-gray-12">
+					<For each={settingsGroups}>
+						{(group) => (
+							<div class="space-y-1">
+								<p class="px-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-gray-9">
+									{group.label}
+								</p>
+								<ul class="space-y-1">
+									<For each={group.items}>
+										{(item) => (
+											<li>
+												<A
+													href={item.href}
+													end={item.href === "/"}
+													activeClass="bg-gray-5 pointer-events-none"
+													class="cap-settings-nav-item rounded-lg h-8 hover:bg-gray-3 text-[13px] px-2 flex flex-row items-center gap-1.5 transition-colors"
+												>
+													<item.icon
+														class="opacity-60 size-4"
+														aria-hidden="true"
+													/>
+													<span>{item.name}</span>
+												</A>
+											</li>
+										)}
+									</For>
+								</ul>
+							</div>
 						)}
 					</For>
-				</ul>
+				</nav>
 				<div class="cap-settings-account p-2.5 text-left flex flex-col">
 					<Show when={version()}>
 						{(v) => (
