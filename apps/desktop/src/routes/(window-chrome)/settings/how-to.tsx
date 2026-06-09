@@ -15,19 +15,37 @@ import { Section, SectionCard, SettingsPageContent } from "./Setting";
 const guides = [
 	{
 		id: "vscode-preview",
-		title: "Run Cap in the VS Code editor",
+		title: "Understand the VS Code preview",
 		description:
-			"This project is configured to start its browser preview automatically when you open the folder in VS Code.",
+			"The browser preview lets you inspect Cap's interface, but browser security prevents it from running Cap's native recorder.",
 		icon: IconLucideTerminal,
 		steps: [
 			"Open the Cap project folder in VS Code.",
 			"If VS Code asks whether automatic tasks are allowed, choose Allow.",
-			"Wait for the Cap: Desktop Preview task to start. It runs the existing Cap desktop web UI on port 3002.",
+			"Wait for the Cap: Browser Preview (No Real Recording) task to start. It runs the existing Cap desktop web UI on port 3002.",
 			"VS Code should open Cap in an editor Preview tab automatically.",
 			"If the preview does not open, open the Ports panel, find port 3002, and choose Open in Preview.",
-			"You can also open http://127.0.0.1:3002 inside VS Code's Simple Browser.",
 			"Keep the preview task running while you edit. Changes should appear automatically.",
-			"Remember that screen recording, camera access, file dialogs, and Google sign-in require the rebuilt Tauri desktop app. The editor preview simulates native features so you can inspect the UI.",
+			"The preview cannot capture your real screen, microphone, camera, system audio, files, or native export.",
+			"GitHub Codespaces cannot record your computer screen because it runs on a remote Linux server.",
+		],
+	},
+	{
+		id: "desktop-start",
+		title: "Start the real Cap desktop app",
+		description:
+			"Use the numbered VS Code tasks on a local macOS or Windows computer. You do not need Render and you do not need to type commands.",
+		icon: IconLucideDownload,
+		steps: [
+			"Download this Cap repository to your Mac or Windows PC and open that local folder in VS Code.",
+			"Install Node.js LTS and Rust. On macOS, also install Xcode Command Line Tools. On Windows, install Microsoft C++ Build Tools with Desktop development with C++ selected.",
+			"In VS Code, select Terminal from the top menu, then select Run Task.",
+			"Select Cap: Start Here Guided Helper if you want VS Code to explain what it sees.",
+			"Open Run Task again, select Cap: 1. First-Time Desktop Setup, and follow the numbered messages until setup finishes.",
+			"Open Run Task again and select Cap: 2. Start Native Desktop App.",
+			"Wait for the Cap - Development window to open. Keep the VS Code task running while using Cap.",
+			"Allow screen recording, microphone, and camera access when your computer asks.",
+			"After you confirm recording and editing work, use Cap: 3. Build Installable Desktop App to create an app you can install normally.",
 		],
 	},
 	{
@@ -161,12 +179,12 @@ export default function HowToPage() {
 							</div>
 							<div class="space-y-1">
 								<p class="text-[13px] font-medium text-gray-12">
-									The easiest first recording
+									Use the native desktop app to record
 								</p>
 								<p class="text-xs leading-relaxed text-gray-10">
-									Choose Studio mode, select Display, click Start Recording,
-									then stop when you are done. Cap opens the editor
-									automatically.
+									The browser page is a UI preview. On a local Mac or Windows
+									PC, run the numbered VS Code tasks to launch Cap's real
+									recorder and editor.
 								</p>
 							</div>
 						</div>

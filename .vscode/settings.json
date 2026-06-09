@@ -2,7 +2,7 @@
 	"remote.autoForwardPorts": true,
 	"remote.portsAttributes": {
 		"3002": {
-			"label": "Cap Desktop Preview",
+			"label": "Cap Browser Preview (No Real Recording)",
 			"onAutoForward": "openPreview"
 		}
 	},

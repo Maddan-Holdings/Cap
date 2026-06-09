@@ -19,6 +19,7 @@ import "@cap/ui-solid/main.css";
 import "unfonts.css";
 import "./styles/theme.css";
 
+import { BrowserPreviewNavigation } from "./components/BrowserPreviewNavigation";
 import { CapErrorBoundary } from "./components/CapErrorBoundary";
 import WindowChromeLayout from "./routes/(window-chrome)";
 import SettingsLayout from "./routes/(window-chrome)/settings";
@@ -167,7 +168,12 @@ function Inner() {
 							}
 						});
 
-						return <Suspense fallback={null}>{props.children}</Suspense>;
+						return (
+							<>
+								<BrowserPreviewNavigation />
+								<Suspense fallback={null}>{props.children}</Suspense>
+							</>
+						);
 					}}
 				>
 					<Route path="/" component={WindowChromeLayout}>

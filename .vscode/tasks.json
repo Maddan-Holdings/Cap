@@ -1,0 +1,87 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Cap: Browser Preview (No Real Recording)",
+			"type": "shell",
+			"command": "pnpm --dir apps/desktop localdev",
+			"isBackground": true,
+			"problemMatcher": {
+				"owner": "cap-desktop-preview",
+				"pattern": {
+					"regexp": "^(.*)$",
+					"message": 1
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": ".*",
+					"endsPattern": "Local:.*3002"
+				}
+			},
+			"presentation": {
+				"reveal": "never",
+				"panel": "dedicated",
+				"clear": false
+			},
+			"runOptions": {
+				"runOn": "folderOpen",
+				"instanceLimit": 1
+			}
+		},
+		{
+			"label": "Cap: Start Here Guided Helper",
+			"type": "process",
+			"command": "node",
+			"args": ["scripts/beginner-desktop.js", "guide"],
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"focus": true,
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"label": "Cap: 1. First-Time Desktop Setup",
+			"type": "process",
+			"command": "node",
+			"args": ["scripts/beginner-desktop.js", "setup"],
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"focus": true,
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"label": "Cap: 2. Start Native Desktop App",
+			"type": "process",
+			"command": "node",
+			"args": ["scripts/beginner-desktop.js", "start"],
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"focus": false,
+				"panel": "dedicated",
+				"clear": true
+			},
+			"runOptions": {
+				"instanceLimit": 1
+			}
+		},
+		{
+			"label": "Cap: 3. Build Installable Desktop App",
+			"type": "process",
+			"command": "node",
+			"args": ["scripts/beginner-desktop.js", "build"],
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"focus": true,
+				"panel": "dedicated",
+				"clear": true
+			}
+		}
+	]
+}
