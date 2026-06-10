@@ -94,6 +94,17 @@ Additionally, `unused_must_use = "deny"` applies to all Rust code: every `Result
 - Preserve the Course Library/folder system and Google Drive integration as intentional extensions.
 - Browser preview code may bridge or simulate unavailable Tauri APIs, but it must render Cap's existing UI routes rather than duplicate them.
 
+## Deep Investigation Default
+When asked to inspect, review, optimize, secure, or fix something, do not stop at the obvious local change. First trace the full path and run a second-pass blast-radius review:
+
+- identify the real root cause, not only the symptom
+- trace callers, side effects, async/runtime behavior, generated artifacts, caches, exports, old data, and platform-specific paths
+- compare old vs new behavior when reviewing a diff
+- call out what is verified vs merely plausible
+- consider likely follow-up reviewer or user reports before calling it done
+- verify the actual user-visible outcome where practical, not only compile/lint success
+
+Prefer the smallest correct fix, but only after checking whether the narrow fix misses related consequences.
 ## Effect Usage
 - Next.js API routes in `apps/web/app/api/*` are built with `@effect/platform`'s `HttpApi` builder; copy the existing class/group/endpoint pattern instead of ad-hoc handlers.
 - Acquire backend services (e.g., `Videos`, `S3Buckets`) inside `Effect.gen` blocks and wire them through `Layer.provide`/`HttpApiBuilder.group`, translating domain errors to `HttpApiError` variants.
