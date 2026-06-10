@@ -24,8 +24,11 @@ import { authStore, userProfileStore } from "~/store";
 import { trackEvent } from "~/utils/analytics";
 import { createSignInMutation } from "~/utils/auth";
 import { isBrowserPreview } from "~/utils/browser-preview";
-import { clientEnv } from "~/utils/env";
-import { apiClient, protectedHeaders } from "~/utils/web-api";
+import {
+	apiClient,
+	getConfiguredServerUrl,
+	protectedHeaders,
+} from "~/utils/web-api";
 import IconLucideCircleHelp from "~icons/lucide/circle-help";
 import IconLucideCloud from "~icons/lucide/cloud";
 import IconLucideFolder from "~icons/lucide/folder";
@@ -58,7 +61,7 @@ function isCachedProfileForUser(
 async function loadProfileImageObjectUrl(signal: AbortSignal) {
 	const imageUrl = new URL(
 		"/api/desktop/user/profile/image",
-		clientEnv.VITE_SERVER_URL,
+		await getConfiguredServerUrl(),
 	).toString();
 
 	const response = await tauriFetch(imageUrl, {
@@ -299,8 +302,8 @@ export default function Settings(props: RouteSectionProps) {
 	});
 	const accountImageUrl = createMemo(() => profileImageObjectUrl());
 	const openDashboard = () => {
-		void shell.open(
-			new URL("/dashboard", clientEnv.VITE_SERVER_URL).toString(),
+		void getConfiguredServerUrl().then((serverUrl) =>
+			shell.open(new URL("/dashboard", serverUrl).toString()),
 		);
 	};
 	const handleProfileClick = () => {
