@@ -309,9 +309,11 @@ fn should_show_onboarding(app: &AppHandle) -> bool {
         .map(|s| s.has_completed_onboarding)
         .unwrap_or(false);
 
-    !startup_completed
-        || !onboarding_completed
-        || !permissions::do_permissions_check(false).necessary_granted()
+    if !startup_completed || !onboarding_completed {
+        return true;
+    }
+
+    false
 }
 
 #[cfg(target_os = "macos")]

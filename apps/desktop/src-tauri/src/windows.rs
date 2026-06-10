@@ -1371,7 +1371,15 @@ impl ShowCapWindow {
 
         let window = match self {
             Self::Main { init_target_mode } => {
-                if !permissions::do_permissions_check(false).necessary_granted() {
+                let onboarding_completed = GeneralSettingsStore::get(app)
+                    .ok()
+                    .flatten()
+                    .map(|s| s.has_completed_onboarding)
+                    .unwrap_or(false);
+
+                if !onboarding_completed
+                    && !permissions::do_permissions_check(false).necessary_granted()
+                {
                     return Box::pin(Self::Onboarding.show(app)).await;
                 }
 
